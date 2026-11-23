@@ -84,6 +84,19 @@
   .pay-opt{ display:flex; gap:10px; margin-top:8px; }
   .pay-opt button{ flex:1; padding:12px; border-radius:10px; border:2px solid var(--line); background:#fff; font-size:16px; cursor:pointer; }
   .pay-opt button.on{ border-color:var(--green); background:#eafaf1; font-weight:700; }
+  /* 锁屏 */
+  #lockScreen{ position:fixed; inset:0; background:linear-gradient(160deg,#c0392b,#96281b); z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; padding:24px; }
+  #lockScreen .logo{ font-size:54px; }
+  #lockScreen h2{ font-size:22px; margin-top:10px; letter-spacing:2px; }
+  #lockTip{ font-size:14px; opacity:.9; margin-top:8px; min-height:20px; text-align:center; }
+  .dots{ display:flex; gap:14px; margin:26px 0 8px; }
+  .dots span{ width:16px; height:16px; border-radius:50%; border:2px solid #fff; display:block; }
+  .dots span.f{ background:#fff; }
+  #lockErr{ color:#ffe08a; font-size:14px; min-height:20px; }
+  .pad{ display:grid; grid-template-columns:repeat(3,76px); gap:14px; margin-top:16px; }
+  .pad button{ height:64px; border-radius:50%; border:1px solid rgba(255,255,255,.5); background:rgba(255,255,255,.08); color:#fff; font-size:24px; cursor:pointer; }
+  .pad button:active{ background:rgba(255,255,255,.25); }
+  .pad button.fn{ font-size:15px; }
 </style>
 </head>
 <body>
@@ -146,6 +159,14 @@
       <div id="expList"></div>
     </div>
     <div class="card">
+      <div style="font-weight:700;margin-bottom:4px">安全设置</div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="changePin()">修改密码</button>
+        <button class="btn btn-ghost" onclick="disablePin()">关闭密码</button>
+      </div>
+      <p class="hint">打开应用需要输入 4 位数字密码。密码只存在这台手机上，忘了密码只能清除应用数据（账本会一起丢失），请务必牢记。</p>
+    </div>
+    <div class="card">
       <div style="font-weight:700;margin-bottom:4px">数据备份</div>
       <div class="btn-row">
         <button class="btn btn-ghost" onclick="exportData()">导出备份</button>
@@ -205,6 +226,21 @@
     <label>日期</label><input id="efDate" type="date">
     <button class="btn btn-main" onclick="saveExp()">保存</button>
     <button class="btn btn-ghost" onclick="hide('expMask')">取消</button>
+  </div>
+</div>
+
+<!-- 锁屏 -->
+<div id="lockScreen" style="display:none">
+  <div class="logo">🍜</div>
+  <h2>饭店点餐记账</h2>
+  <div id="lockTip">输入密码进入</div>
+  <div class="dots" id="lockDots"><span></span><span></span><span></span><span></span></div>
+  <div id="lockErr"></div>
+  <div class="pad">
+    <button onclick="padPress('1')">1</button><button onclick="padPress('2')">2</button><button onclick="padPress('3')">3</button>
+    <button onclick="padPress('4')">4</button><button onclick="padPress('5')">5</button><button onclick="padPress('6')">6</button>
+    <button onclick="padPress('7')">7</button><button onclick="padPress('8')">8</button><button onclick="padPress('9')">9</button>
+    <button class="fn" onclick="padPress('clear')">清空</button><button onclick="padPress('0')">0</button><button class="fn" onclick="padPress('del')">删除</button>
   </div>
 </div>
 
@@ -491,7 +527,53 @@ function importData(ev){
   ev.target.value = "";
 }
 
+/* ---------- 密码锁 ---------- */
+var lockMode = "unlock", pinBuf = "", pinTemp = "", lockDone = null;
+function hashPin(p){ var h = 5381; for(var i=0;i<p.length;i++){ h = ((h<<5)+h+p.charCodeAt(i))>>>0; } return "h" + h.toString(16); }
+function showLock(mode, done){
+  lockMode = mode; lockDone = done||null; pinBuf = "";
+  var tip = document.getElementById("lockTip");
+  if(mode==="setup") tip.textContent = "第一次使用，请设置 4 位数字密码";
+  else if(mode==="setup2") tip.textContent = "再输入一次新密码确认";
+  else if(mode==="changeNew") tip.textContent = "输入新的 4 位数字密码";
+  else tip.textContent = "输入密码进入";
+  document.getElementById("lockErr").textContent = "";
+  document.getElementById("lockScreen").style.display = "flex";
+  drawDots();
+}
+function hideLock(){ document.getElementById("lockScreen").style.display = "none"; }
+function drawDots(){ var ds = document.getElementById("lockDots").children; for(var i=0;i<4;i++) ds[i].className = (i<pinBuf.length)? "f":""; }
+function lockErr(msg){ document.getElementById("lockErr").textContent = msg; pinBuf = ""; drawDots(); }
+function padPress(k){
+  if(k==="clear"){ pinBuf = ""; drawDots(); return; }
+  if(k==="del"){ pinBuf = pinBuf.slice(0,-1); drawDots(); return; }
+  if(pinBuf.length>=4) return;
+  pinBuf += k; drawDots();
+  if(pinBuf.length===4) setTimeout(lockSubmit, 130);
+}
+function lockSubmit(){
+  var v = pinBuf;
+  if(lockMode==="setup"){ pinTemp = v; showLock("setup2", lockDone); return; }
+  if(lockMode==="setup2"){
+    if(v===pinTemp){ state.pinHash = hashPin(v); save(); hideLock(); if(lockDone) lockDone(true); }
+    else { pinTemp = ""; showLock("setup", lockDone); document.getElementById("lockErr").textContent = "两次输入不一致，请重新设置"; }
+    return;
+  }
+  if(lockMode==="changeNew"){ state.pinHash = hashPin(v); save(); hideLock(); alert("密码已修改"); if(lockDone) lockDone(true); return; }
+  if(hashPin(v)===state.pinHash){ hideLock(); if(lockDone) lockDone(true); }
+  else lockErr("密码不对，再试一次");
+}
+function changePin(){
+  if(!state.pinHash){ showLock("setup"); return; }
+  showLock("unlock", function(ok){ if(ok) showLock("changeNew"); });
+}
+function disablePin(){
+  if(!state.pinHash){ alert("现在没有设置密码"); return; }
+  showLock("unlock", function(ok){ if(ok){ delete state.pinHash; save(); alert("密码已关闭，下次打开不再询问"); } });
+}
+
 renderTables();
+if(state.pinHash) showLock("unlock"); else showLock("setup");
 </script>
 </body>
 </html>
