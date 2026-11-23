@@ -1,0 +1,24 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.local.restaurant'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.local.restaurant'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+}
+
+
+
+
+
+
+
+
+
+
