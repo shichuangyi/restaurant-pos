@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>饭店点餐记账</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --main:#c0392b; --main-dark:#96281b; --bg:#f7f3ee; --card:#ffffff;
+    --text:#2c2c2c; --muted:#8a8a8a; --line:#e8e0d5; --green:#1e8449; --orange:#e67e22;
+  }
+  html,body{ height:100%; }
+  body{ font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); font-size:16px; }
+  header{ background:var(--main); color:#fff; padding:14px 16px 10px; position:sticky; top:0; z-index:20; }
+  header h1{ font-size:19px; font-weight:700; letter-spacing:1px; }
+  header .sub{ font-size:12px; opacity:.85; margin-top:2px; }
+  main{ padding:12px 12px 84px; max-width:640px; margin:0 auto; }
+  .page{ display:none; } .page.active{ display:block; }
+  /* 底部导航 */
+  nav{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); display:flex; z-index:30; }
+  nav button{ flex:1; background:none; border:none; padding:8px 0 10px; font-size:13px; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:2px; }
+  nav button .ico{ font-size:21px; line-height:1; }
+  nav button.on{ color:var(--main); font-weight:700; }
+  /* 桌台 */
+  .tbl-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .tbl{ background:var(--card); border:2px solid var(--line); border-radius:12px; padding:16px 6px 12px; text-align:center; cursor:pointer; }
+  .tbl .no{ font-size:19px; font-weight:700; }
+  .tbl .st{ font-size:12px; color:var(--muted); margin-top:4px; }
+  .tbl .amt{ font-size:13px; color:var(--main); font-weight:700; margin-top:2px; min-height:16px; }
+  .tbl.busy{ border-color:var(--main); background:#fdf0ec; }
+  /* 分类与菜品 */
+  .chips{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 10px; }
+  .chip{ flex:none; padding:6px 14px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:14px; cursor:pointer; }
+  .chip.on{ background:var(--main); color:#fff; border-color:var(--main); }
+  .dish-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .dish{ background:var(--card); border-radius:12px; padding:12px; border:1px solid var(--line); }
+  .dish .nm{ font-size:16px; font-weight:600; }
+  .dish .pr{ color:var(--main); font-weight:700; margin-top:4px; }
+  .dish .row{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .addbtn{ background:var(--main); color:#fff; border:none; width:34px; height:34px; border-radius:50%; font-size:20px; line-height:1; cursor:pointer; }
+  .cat-lbl{ font-size:12px; color:var(--muted); }
+  /* 订单 */
+  .card{ background:var(--card); border-radius:12px; border:1px solid var(--line); padding:12px; margin-bottom:10px; }
+  .ord-row{ display:flex; align-items:center; padding:8px 0; border-bottom:1px dashed var(--line); }
+  .ord-row:last-child{ border-bottom:none; }
+  .ord-row .nm{ flex:1; } .ord-row .nm small{ color:var(--muted); display:block; font-size:12px; }
+  .stepper{ display:flex; align-items:center; gap:8px; }
+  .stepper button{ width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:17px; cursor:pointer; }
+  .stepper .q{ min-width:22px; text-align:center; font-weight:700; }
+  .ord-row .sub2{ width:64px; text-align:right; font-weight:600; }
+  .total-row{ display:flex; justify-content:space-between; font-size:18px; font-weight:800; padding:10px 2px 2px; }
+  .total-row .v{ color:var(--main); }
+  .btn{ display:block; width:100%; padding:13px; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; margin-top:10px; }
+  .btn-main{ background:var(--main); color:#fff; } .btn-main:active{ background:var(--main-dark); }
+  .btn-ghost{ background:#fff; color:var(--text); border:1px solid var(--line); }
+  .btn-green{ background:var(--green); color:#fff; }
+  .btn-row{ display:flex; gap:10px; } .btn-row .btn{ margin-top:10px; }
+  .backlink{ color:var(--main); font-size:15px; background:none; border:none; padding:4px 0 10px; cursor:pointer; font-weight:600; }
+  /* 列表通用 */
+  .li{ display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid var(--line); }
+  .li:last-child{ border-bottom:none; }
+  .li .t small{ display:block; color:var(--muted); font-size:12px; margin-top:2px; }
+  .li .amt{ font-weight:700; }
+  .amt.plus{ color:var(--green); } .amt.minus{ color:var(--main); }
+  .del{ color:var(--main); background:none; border:none; font-size:13px; cursor:pointer; padding:4px 6px; }
+  .edit{ color:var(--orange); background:none; border:none; font-size:13px; cursor:pointer; padding:4px 6px; }
+  /* 表单 */
+  label{ display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input,select{ width:100%; padding:11px; border:1px solid var(--line); border-radius:8px; font-size:16px; background:#fff; }
+  .sum-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px; }
+  .sum-box{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 6px; text-align:center; }
+  .sum-box .v{ font-size:19px; font-weight:800; } .sum-box .k{ font-size:12px; color:var(--muted); margin-top:3px; }
+  .seg{ display:flex; gap:8px; margin-bottom:10px; }
+  .seg button{ flex:1; padding:9px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:15px; cursor:pointer; }
+  .seg button.on{ background:var(--main); color:#fff; border-color:var(--main); font-weight:700; }
+  .empty{ text-align:center; color:var(--muted); padding:28px 0; font-size:14px; }
+  .hint{ font-size:12px; color:var(--muted); line-height:1.6; margin-top:8px; }
+  /* 弹窗 */
+  .mask{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; z-index:50; align-items:flex-end; justify-content:center; }
+  .mask.show{ display:flex; }
+  .sheet{ background:#fff; width:100%; max-width:640px; border-radius:16px 16px 0 0; padding:18px 16px 26px; max-height:86vh; overflow-y:auto; }
+  .sheet h3{ font-size:17px; margin-bottom:6px; }
+  .pay-opt{ display:flex; gap:10px; margin-top:8px; }
+  .pay-opt button{ flex:1; padding:12px; border-radius:10px; border:2px solid var(--line); background:#fff; font-size:16px; cursor:pointer; }
+  .pay-opt button.on{ border-color:var(--green); background:#eafaf1; font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍜 饭店点餐记账</h1>
+  <div class="sub">本地运行 · 数据只存在这台手机上 · 不联网</div>
+</header>
+
+<main>
+  <!-- 点餐页 -->
+  <section class="page active" id="pg-order">
+    <div id="tbl-view">
+      <div class="tbl-grid" id="tblGrid"></div>
+      <p class="hint">点一张桌子开始点餐。用餐中的桌子可以继续加菜、退菜，结账后自动记入账本。</p>
+    </div>
+    <div id="ord-view" style="display:none">
+      <button class="backlink" onclick="closeTable()">← 返回桌台</button>
+      <div class="chips" id="catChips"></div>
+      <div class="dish-grid" id="dishGrid"></div>
+      <div class="card" style="margin-top:12px">
+        <div style="font-weight:700" id="ordTitle">本桌已点</div>
+        <div id="ordList"></div>
+        <div class="total-row"><span>合计</span><span class="v" id="ordTotal">¥0.00</span></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="closeTable()">先挂单</button>
+          <button class="btn btn-green" onclick="openPay()">结账</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 账单页 -->
+  <section class="page" id="pg-bills">
+    <label>查看日期</label>
+    <input type="date" id="billDate" onchange="renderBills()">
+    <div class="card" style="margin-top:10px"><div id="billList"></div></div>
+    <div class="sum-box"><div class="v" id="billDayTotal">¥0.00</div><div class="k">当日营业额</div></div>
+  </section>
+
+  <!-- 菜品页 -->
+  <section class="page" id="pg-dishes">
+    <button class="btn btn-main" onclick="openDishForm()">＋ 添加菜品</button>
+    <div class="card" style="margin-top:10px"><div id="dishList"></div></div>
+  </section>
+
+  <!-- 记账页 -->
+  <section class="page" id="pg-books">
+    <div class="seg">
+      <button id="segToday" class="on" onclick="setRange('today')">今日</button>
+      <button id="segMonth" onclick="setRange('month')">本月</button>
+    </div>
+    <div class="sum-grid">
+      <div class="sum-box"><div class="v" style="color:var(--green)" id="sumIn">¥0</div><div class="k">营业额</div></div>
+      <div class="sum-box"><div class="v" style="color:var(--main)" id="sumOut">¥0</div><div class="k">支出</div></div>
+      <div class="sum-box"><div class="v" id="sumNet">¥0</div><div class="k">结余</div></div>
+    </div>
+    <button class="btn btn-main" onclick="openExpForm()">＋ 记一笔支出</button>
+    <div class="card" style="margin-top:10px">
+      <div style="font-weight:700;margin-bottom:4px">支出明细</div>
+      <div id="expList"></div>
+    </div>
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:4px">数据备份</div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="exportData()">导出备份</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('impFile').click()">导入备份</button>
+      </div>
+      <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(event)">
+      <p class="hint">所有数据只保存在这台手机里。换手机或重装前，先导出备份文件，之后再导入即可恢复。</p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button id="nav-order" class="on" onclick="go('order')"><span class="ico">🧾</span>点餐</button>
+  <button id="nav-bills" onclick="go('bills')"><span class="ico">📋</span>账单</button>
+  <button id="nav-dishes" onclick="go('dishes')"><span class="ico">🍲</span>菜品</button>
+  <button id="nav-books" onclick="go('books')"><span class="ico">💰</span>记账</button>
+</nav>
+
+<!-- 结账弹窗 -->
+<div class="mask" id="payMask">
+  <div class="sheet">
+    <h3>结账 · <span id="payTbl"></span></h3>
+    <div class="total-row"><span>应收</span><span class="v" id="payTotal">¥0.00</span></div>
+    <label>收款方式</label>
+    <div class="pay-opt" id="payOpts">
+      <button data-pay="现金" class="on" onclick="pickPay(this)">现金</button>
+      <button data-pay="微信" onclick="pickPay(this)">微信</button>
+      <button data-pay="支付宝" onclick="pickPay(this)">支付宝</button>
+    </div>
+    <label>实收金额（可改，打折/抹零时用）</label>
+    <input type="number" id="payActual" step="0.01" min="0">
+    <button class="btn btn-green" onclick="doCheckout()">确认收款</button>
+    <button class="btn btn-ghost" onclick="hide('payMask')">取消</button>
+  </div>
+</div>
+
+<!-- 菜品表单 -->
+<div class="mask" id="dishMask">
+  <div class="sheet">
+    <h3 id="dishFormTitle">添加菜品</h3>
+    <label>菜名</label><input id="dfName" placeholder="如：番茄炒蛋">
+    <label>价格（元）</label><input id="dfPrice" type="number" step="0.5" min="0" placeholder="如：18">
+    <label>分类</label><input id="dfCat" placeholder="如：热菜 / 凉菜 / 主食 / 汤 / 酒水">
+    <button class="btn btn-main" onclick="saveDish()">保存</button>
+    <button class="btn btn-ghost" onclick="hide('dishMask')">取消</button>
+  </div>
+</div>
+
+<!-- 支出表单 -->
+<div class="mask" id="expMask">
+  <div class="sheet">
+    <h3>记一笔支出</h3>
+    <label>金额（元）</label><input id="efAmt" type="number" step="0.01" min="0" placeholder="如：350">
+    <label>类别</label>
+    <select id="efCat"><option>采购食材</option><option>房租</option><option>水电燃气</option><option>工资</option><option>其他</option></select>
+    <label>备注</label><input id="efNote" placeholder="如：买菜、调料">
+    <label>日期</label><input id="efDate" type="date">
+    <button class="btn btn-main" onclick="saveExp()">保存</button>
+    <button class="btn btn-ghost" onclick="hide('expMask')">取消</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+var KEY = "restaurant_pos_v1";
+var state = load();
+var curTable = null, curCat = "全部", payMethod = "现金", editDishId = null, range = "today";
+
+function seed(){
+  var dishes = [
+    {id:1,name:"番茄炒蛋",price:18,cat:"热菜"},{id:2,name:"青椒肉丝",price:22,cat:"热菜"},
+    {id:3,name:"麻婆豆腐",price:16,cat:"热菜"},{id:4,name:"回锅肉",price:26,cat:"热菜"},
+    {id:5,name:"凉拌黄瓜",price:10,cat:"凉菜"},{id:6,name:"皮蛋豆腐",price:12,cat:"凉菜"},
+    {id:7,name:"米饭",price:2,cat:"主食"},{id:8,name:"手工面条",price:12,cat:"主食"},
+    {id:9,name:"紫菜蛋花汤",price:8,cat:"汤"},{id:10,name:"酸辣汤",price:10,cat:"汤"},
+    {id:11,name:"矿泉水",price:2,cat:"酒水"},{id:12,name:"啤酒",price:6,cat:"酒水"}
+  ];
+  var tables = []; for (var i=1;i<=12;i++) tables.push({no:i, items:[]});
+  return { dishes:dishes, tables:tables, bills:[], expenses:[], nextDish:13, nextBill:1 };
+}
+function load(){
+  try{ var s = localStorage.getItem(KEY); if(s){ return JSON.parse(s); } }catch(e){}
+  var d = seed(); try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(e){}
+  return d;
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function money(n){ return "¥" + Number(n||0).toFixed(2); }
+function todayStr(d){ d = d||new Date(); var m=("0"+(d.getMonth()+1)).slice(-2), dd=("0"+d.getDate()).slice(-2); return d.getFullYear()+"-"+m+"-"+dd; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function show(id){ document.getElementById(id).classList.add("show"); }
+function hide(id){ document.getElementById(id).classList.remove("show"); }
+
+function go(p){
+  var pages = ["order","bills","dishes","books"];
+  for (var i=0;i<pages.length;i++){
+    document.getElementById("pg-"+pages[i]).classList.toggle("active", pages[i]===p);
+    document.getElementById("nav-"+pages[i]).classList.toggle("on", pages[i]===p);
+  }
+  if(p==="order") renderTables();
+  if(p==="bills"){ document.getElementById("billDate").value = todayStr(); renderBills(); }
+  if(p==="dishes") renderDishList();
+  if(p==="books") renderBooks();
+}
+
+/* ---------- 点餐 ---------- */
+function tableTotal(t){ var s=0; for(var i=0;i<t.items.length;i++) s += t.items[i].price*t.items[i].qty; return s; }
+function renderTables(){
+  var g = document.getElementById("tblGrid"); g.innerHTML = "";
+  state.tables.forEach(function(t){
+    var tot = tableTotal(t);
+    var d = document.createElement("div");
+    d.className = "tbl" + (t.items.length? " busy":"");
+    d.innerHTML = '<div class="no">'+t.no+' 号桌</div><div class="st">'+(t.items.length? "用餐中 · "+t.items.reduce(function(a,b){return a+b.qty;},0)+" 件":"空闲")+'</div><div class="amt">'+(t.items.length? money(tot):"")+'</div>';
+    d.onclick = function(){ openTable(t.no); };
+    g.appendChild(d);
+  });
+}
+function cats(){
+  var seen = ["全部"]; state.dishes.forEach(function(d){ if(seen.indexOf(d.cat)<0) seen.push(d.cat); }); return seen;
+}
+function openTable(no){
+  curTable = no; curCat = "全部";
+  document.getElementById("tbl-view").style.display = "none";
+  document.getElementById("ord-view").style.display = "block";
+  renderOrder();
+}
+function closeTable(){
+  curTable = null;
+  document.getElementById("tbl-view").style.display = "block";
+  document.getElementById("ord-view").style.display = "none";
+  renderTables();
+}
+function getTable(){ for(var i=0;i<state.tables.length;i++) if(state.tables[i].no===curTable) return state.tables[i]; return null; }
+function renderOrder(){
+  var t = getTable(); if(!t) return;
+  document.getElementById("ordTitle").textContent = curTable + " 号桌 · 本桌已点";
+  var cc = document.getElementById("catChips"); cc.innerHTML = "";
+  cats().forEach(function(c){
+    var b = document.createElement("button");
+    b.className = "chip" + (c===curCat? " on":""); b.textContent = c;
+    b.onclick = function(){ curCat = c; renderOrder(); };
+    cc.appendChild(b);
+  });
+  var dg = document.getElementById("dishGrid"); dg.innerHTML = "";
+  state.dishes.filter(function(d){ return curCat==="全部" || d.cat===curCat; }).forEach(function(d){
+    var el = document.createElement("div"); el.className = "dish";
+    el.innerHTML = '<div class="nm">'+esc(d.name)+'</div><div class="row"><span class="pr">'+money(d.price)+'</span><span class="cat-lbl">'+esc(d.cat)+'</span></div>';
+    var btn = document.createElement("button"); btn.className = "addbtn"; btn.textContent = "＋";
+    btn.onclick = function(){ addItem(d.id); };
+    el.querySelector(".row").appendChild(btn);
+    dg.appendChild(el);
+  });
+  var ol = document.getElementById("ordList"); ol.innerHTML = "";
+  if(!t.items.length) ol.innerHTML = '<div class="empty">还没有点菜，点上方菜品的 ＋ 添加</div>';
+  t.items.forEach(function(it, idx){
+    var row = document.createElement("div"); row.className = "ord-row";
+    row.innerHTML = '<div class="nm">'+esc(it.name)+'<small>'+money(it.price)+' / 份</small></div>';
+    var st = document.createElement("div"); st.className = "stepper";
+    st.innerHTML = '<button>－</button><span class="q">'+it.qty+'</span><button>＋</button>';
+    st.children[0].onclick = function(){ chQty(idx,-1); };
+    st.children[2].onclick = function(){ chQty(idx,1); };
+    var sub = document.createElement("div"); sub.className = "sub2"; sub.textContent = money(it.price*it.qty);
+    row.appendChild(st); row.appendChild(sub);
+    ol.appendChild(row);
+  });
+  document.getElementById("ordTotal").textContent = money(tableTotal(t));
+}
+function addItem(dishId){
+  var t = getTable(); var d = null;
+  state.dishes.forEach(function(x){ if(x.id===dishId) d = x; });
+  if(!d || !t) return;
+  for(var i=0;i<t.items.length;i++){ if(t.items[i].dishId===dishId){ t.items[i].qty++; save(); renderOrder(); return; } }
+  t.items.push({dishId:dishId, name:d.name, price:d.price, qty:1});
+  save(); renderOrder();
+}
+function chQty(idx, delta){
+  var t = getTable(); if(!t) return;
+  t.items[idx].qty += delta;
+  if(t.items[idx].qty<=0) t.items.splice(idx,1);
+  save(); renderOrder();
+}
+
+/* ---------- 结账 ---------- */
+function pickPay(btn){
+  payMethod = btn.getAttribute("data-pay");
+  var bs = document.getElementById("payOpts").children;
+  for(var i=0;i<bs.length;i++) bs[i].classList.toggle("on", bs[i]===btn);
+}
+function openPay(){
+  var t = getTable(); if(!t || !t.items.length){ alert("这桌还没点菜"); return; }
+  document.getElementById("payTbl").textContent = curTable + " 号桌";
+  document.getElementById("payTotal").textContent = money(tableTotal(t));
+  document.getElementById("payActual").value = tableTotal(t).toFixed(2);
+  show("payMask");
+}
+function doCheckout(){
+  var t = getTable(); if(!t) return;
+  var actual = parseFloat(document.getElementById("payActual").value);
+  if(isNaN(actual) || actual<0){ alert("实收金额不对"); return; }
+  var now = new Date();
+  state.bills.push({
+    id: state.nextBill++, table: curTable,
+    items: JSON.parse(JSON.stringify(t.items)),
+    total: tableTotal(t), actual: actual, pay: payMethod,
+    date: todayStr(now), time: ("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2)
+  });
+  t.items = [];
+  save(); hide("payMask"); closeTable(); go("bills");
+  alert("结账完成，已记入账本");
+}
+
+/* ---------- 账单 ---------- */
+function renderBills(){
+  var date = document.getElementById("billDate").value || todayStr();
+  var list = state.bills.filter(function(b){ return b.date===date; });
+  var box = document.getElementById("billList"); box.innerHTML = "";
+  var total = 0;
+  if(!list.length) box.innerHTML = '<div class="empty">这一天还没有账单</div>';
+  list.slice().reverse().forEach(function(b){
+    total += b.actual;
+    var names = b.items.map(function(i){ return i.name+"×"+i.qty; }).join("、");
+    var li = document.createElement("div"); li.className = "li";
+    li.innerHTML = '<div class="t"><b>'+b.table+' 号桌</b> · '+esc(b.pay)+'<small>'+b.time+' · '+esc(names)+'</small></div>';
+    var right = document.createElement("div");
+    right.innerHTML = '<span class="amt plus">'+money(b.actual)+'</span>';
+    var del = document.createElement("button"); del.className = "del"; del.textContent = "作废";
+    del.onclick = function(){ if(confirm("确定作废这张账单吗？")){ state.bills = state.bills.filter(function(x){ return x.id!==b.id; }); save(); renderBills(); } };
+    right.appendChild(del);
+    li.appendChild(right);
+    box.appendChild(li);
+  });
+  document.getElementById("billDayTotal").textContent = money(total);
+}
+
+/* ---------- 菜品管理 ---------- */
+function renderDishList(){
+  var box = document.getElementById("dishList"); box.innerHTML = "";
+  if(!state.dishes.length) box.innerHTML = '<div class="empty">还没有菜品，点上方按钮添加</div>';
+  state.dishes.forEach(function(d){
+    var li = document.createElement("div"); li.className = "li";
+    li.innerHTML = '<div class="t"><b>'+esc(d.name)+'</b><small>'+esc(d.cat)+'</small></div>';
+    var right = document.createElement("div");
+    right.innerHTML = '<span class="amt">'+money(d.price)+'</span>';
+    var ed = document.createElement("button"); ed.className = "edit"; ed.textContent = "改";
+    ed.onclick = function(){ openDishForm(d.id); };
+    var del = document.createElement("button"); del.className = "del"; del.textContent = "删";
+    del.onclick = function(){ if(confirm("删除菜品「"+d.name+"」？")){ state.dishes = state.dishes.filter(function(x){ return x.id!==d.id; }); save(); renderDishList(); } };
+    right.appendChild(ed); right.appendChild(del);
+    li.appendChild(right);
+    box.appendChild(li);
+  });
+}
+function openDishForm(id){
+  editDishId = id||null;
+  document.getElementById("dishFormTitle").textContent = id? "修改菜品":"添加菜品";
+  var d = null; state.dishes.forEach(function(x){ if(x.id===id) d = x; });
+  document.getElementById("dfName").value = d? d.name:"";
+  document.getElementById("dfPrice").value = d? d.price:"";
+  document.getElementById("dfCat").value = d? d.cat:"热菜";
+  show("dishMask");
+}
+function saveDish(){
+  var name = document.getElementById("dfName").value.trim();
+  var price = parseFloat(document.getElementById("dfPrice").value);
+  var cat = document.getElementById("dfCat").value.trim() || "其他";
+  if(!name){ alert("菜名不能为空"); return; }
+  if(isNaN(price) || price<0){ alert("价格不对"); return; }
+  if(editDishId){
+    state.dishes.forEach(function(x){ if(x.id===editDishId){ x.name=name; x.price=price; x.cat=cat; } });
+  } else {
+    state.dishes.push({id: state.nextDish++, name:name, price:price, cat:cat});
+  }
+  save(); hide("dishMask"); renderDishList();
+}
+
+/* ---------- 记账 ---------- */
+function setRange(r){ range = r;
+  document.getElementById("segToday").classList.toggle("on", r==="today");
+  document.getElementById("segMonth").classList.toggle("on", r==="month");
+  renderBooks();
+}
+function inRange(dateStr){
+  if(range==="today") return dateStr === todayStr();
+  var now = new Date(); var ym = now.getFullYear()+"-"+("0"+(now.getMonth()+1)).slice(-2);
+  return dateStr.indexOf(ym)===0;
+}
+function renderBooks(){
+  var inSum = 0, outSum = 0;
+  state.bills.forEach(function(b){ if(inRange(b.date)) inSum += b.actual; });
+  var exps = state.expenses.filter(function(e){ return inRange(e.date); });
+  exps.forEach(function(e){ outSum += e.amount; });
+  document.getElementById("sumIn").textContent = money(inSum);
+  document.getElementById("sumOut").textContent = money(outSum);
+  document.getElementById("sumNet").textContent = money(inSum - outSum);
+  var box = document.getElementById("expList"); box.innerHTML = "";
+  if(!exps.length) box.innerHTML = '<div class="empty">这个时段没有支出记录</div>';
+  exps.slice().reverse().forEach(function(e){
+    var li = document.createElement("div"); li.className = "li";
+    li.innerHTML = '<div class="t"><b>'+esc(e.cat)+'</b><small>'+e.date+(e.note? " · "+esc(e.note):"")+'</small></div>';
+    var right = document.createElement("div");
+    right.innerHTML = '<span class="amt minus">-'+money(e.amount)+'</span>';
+    var del = document.createElement("button"); del.className = "del"; del.textContent = "删";
+    del.onclick = function(){ if(confirm("删除这笔支出？")){ state.expenses = state.expenses.filter(function(x){ return x.id!==e.id; }); save(); renderBooks(); } };
+    right.appendChild(del);
+    li.appendChild(right);
+    box.appendChild(li);
+  });
+}
+function openExpForm(){ document.getElementById("efDate").value = todayStr(); document.getElementById("efAmt").value=""; document.getElementById("efNote").value=""; show("expMask"); }
+function saveExp(){
+  var amt = parseFloat(document.getElementById("efAmt").value);
+  if(isNaN(amt) || amt<=0){ alert("金额不对"); return; }
+  var maxId = 0; state.expenses.forEach(function(e){ if(e.id>maxId) maxId = e.id; });
+  state.expenses.push({ id:maxId+1, amount:amt, cat:document.getElementById("efCat").value, note:document.getElementById("efNote").value.trim(), date:document.getElementById("efDate").value || todayStr() });
+  save(); hide("expMask"); renderBooks();
+}
+
+/* ---------- 备份 ---------- */
+function exportData(){
+  var fname = "饭店账本备份-" + todayStr() + ".json";
+  if (window.AndroidBridge && AndroidBridge.saveFile){ AndroidBridge.saveFile(fname, JSON.stringify(state)); return; }
+  var blob = new Blob([JSON.stringify(state)], {type:"application/json"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+}
+function importData(ev){
+  var f = ev.target.files[0]; if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      if(!d.dishes || !d.tables || !d.bills || !d.expenses) throw new Error("bad");
+      state = d; save(); curTable = null;
+      document.getElementById("tbl-view").style.display = "block";
+      document.getElementById("ord-view").style.display = "none";
+      go("books"); alert("导入成功，数据已恢复");
+    }catch(e){ alert("这个文件不是有效的备份"); }
+  };
+  r.readAsText(f);
+  ev.target.value = "";
+}
+
+renderTables();
+</script>
+</body>
+</html>
