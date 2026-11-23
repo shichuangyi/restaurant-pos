@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+
     <application
         android:label="饭店点餐记账"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.NoTitleBar">
         <activity
             android:name=".MainActivity"
@@ -15,4 +17,6 @@
         </activity>
     </application>
 
+
 </manifest>
+
